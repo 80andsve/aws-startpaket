@@ -1,0 +1,47 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "Starter for the scaling stack: load balancer, target group and listener. Stack name: novatrix-skala"
+
+# Build on this: the launch template, the Auto Scaling group and the scaling policy
+# are yours to write, with the same pattern (Type, Properties, !Ref, !ImportValue).
+
+Parameters:
+  Prefix:
+    Type: String
+    Default: novatrix
+    AllowedPattern: "[a-z][a-z0-9-]*"
+
+Resources:
+  LoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Name: !Sub ${Prefix}-alb
+      Type: application
+      Scheme: internet-facing
+      Subnets:
+        - !ImportValue {"Fn::Sub": "${Prefix}-public-subnet-id"}
+        - !ImportValue {"Fn::Sub": "${Prefix}-public-b-subnet-id"}
+      SecurityGroups:
+        - !ImportValue {"Fn::Sub": "${Prefix}-alb-sg-id"}
+
+  TargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: !Sub ${Prefix}-web-tg
+      VpcId: !ImportValue {"Fn::Sub": "${Prefix}-vpc-id"}
+      Protocol: HTTP
+      Port: 80
+      HealthCheckPath: /wp-login.php
+      Matcher: {HttpCode: "200"}
+
+  Listener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      LoadBalancerArn: !Ref LoadBalancer
+      Port: 80
+      Protocol: HTTP
+      DefaultActions:
+        - {Type: forward, TargetGroupArn: !Ref TargetGroup}
+
+Outputs:
+  SiteUrl:
+    Value: !Sub "http://${LoadBalancer.DNSName}"
